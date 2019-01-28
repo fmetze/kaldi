@@ -52,11 +52,12 @@ echo "$0 $@"  # Print the command line for logging
 . ./utils/parse_options.sh
 
 if ! cuda-compiled; then
-  cat <<EOF && exit 1
+  cat <<EOF
 This script is intended to be used with GPUs but you have not compiled Kaldi with CUDA
 If you want to use GPUs (and have them), go to src/, and configure and make on a machine
 where "nvcc" is installed.
 EOF
+  # && exit 1
 fi
 
 train_set=train_rvb
@@ -241,7 +242,8 @@ if [ $stage -le 13 ]; then
     --feat-dir $train_data_dir \
     --tree-dir $treedir \
     --lat-dir $lat_dir \
-    --dir $dir  || exit 1;
+    --dir $dir \
+    --use-gpu=wait || exit 1;
 fi
 
 graph_dir=$dir/graph_pp

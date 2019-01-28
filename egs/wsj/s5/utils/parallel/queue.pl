@@ -57,6 +57,7 @@ my $qsub_opts = "";
 my $sync = 0;
 my $num_threads = 1;
 my $gpu = 0;
+my $cmd_wrapper = "";
 
 my $config = "conf/queue.conf";
 
@@ -218,13 +219,17 @@ while(<CONFIG>) {
   if ($_ =~ /^command (.+)/) {
     $read_command = 1;
     $qsub_cmd = $1 . " ";
+  } elsif ($_ =~ m/^wrapper (.+)/) {
+    # This is a wrapper around the command (e.g. for singularity)
+    $cmd_wrapper = $1;
   } elsif ($_ =~ m/^option ([^=]+)=\* (.+)$/) {
     # Config option that needs replacement with parameter value read from CLI
     # e.g.: option mem=* -l mem_free=$0,ram_free=$0
     my $option = $1;     # mem
     my $arg= $2;         # -l mem_free=$0,ram_free=$0
     if ($arg !~ m:\$0:) {
-      die "Unable to parse line '$line' in config file ($config)\n";
+      #die "Unable to parse line '$line' in config file ($config)\n";
+      #print STDERR "Warning: the line '$line' in config file ($config) does not substitute variable \$0\n";
     }
     if (exists $cli_options{$option}) {
       # Replace $0 with the argument read from command line.
@@ -337,10 +342,10 @@ if (! -d "$qdir/sync") {
 
 my $queue_array_opt = "";
 if ($array_job == 1) { # It's an array job.
-  $queue_array_opt = "-t $jobstart:$jobend";
-  $logfile =~ s/$jobname/\$SGE_TASK_ID/g; # This variable will get
+  $queue_array_opt = "-t $jobstart-$jobend";
+  $logfile =~ s/$jobname/\$PBS_ARRAYID/g; # This variable will get
   # replaced by qsub, in each job, with the job-id.
-  $cmd =~ s/$jobname/\$\{SGE_TASK_ID\}/g; # same for the command...
+  $cmd =~ s/$jobname/\$\{PBS_ARRAYID\}/g; # same for the command...
   $queue_logfile =~ s/\.?$jobname//; # the log file in the q/ subdirectory
   # is for the queue to put its log, and this doesn't need the task array subscript
   # so we remove it.
@@ -377,7 +382,13 @@ print Q "$cmd\n"; # this is a way of echoing the command into a comment in the l
 print Q "EOF\n"; # without having to escape things like "|" and quote characters.
 print Q ") >$logfile\n";
 print Q "time1=\`date +\"%s\"\`\n";
-print Q " ( $cmd ) 2>>$logfile >>$logfile\n";
+#print Q "( $cmd ) 2>>$logfile >>$logfile\n";
+print Q "ls /data/MM1 /data/ASR1 /data/ASR5 /project/hsr /project/ocean /compute/compute-0-30 /compute/compute-0-31 /compute/compute-0-32 /compute/compute-0-33 /compute/compute-0-34 2>/dev/null >/dev/null\n";
+print Q "cat <<EOF | $cmd_wrapper >>$logfile 2>&1\n";
+print Q "cd $cwd\n";
+print Q ". ./path.sh\n";
+print Q "$cmd\n";
+print Q "EOF\n";
 print Q "ret=\$?\n";
 print Q "time2=\`date +\"%s\"\`\n";
 print Q "echo '#' Accounting: time=\$((\$time2-\$time1)) threads=$num_threads >>$logfile\n";
@@ -387,11 +398,11 @@ print Q "[ \$ret -eq 137 ] && exit 100;\n"; # If process was killed (e.g. oom) i
 if ($array_job == 0) { # not an array job
   print Q "touch $syncfile\n"; # so we know it's done.
 } else {
-  print Q "touch $syncfile.\$SGE_TASK_ID\n"; # touch a bunch of sync-files.
+  print Q "touch $syncfile.\$PBS_ARRAYID\n"; # touch a bunch of sync-files.
 }
 print Q "exit \$[\$ret ? 1 : 0]\n"; # avoid status 100 which grid-engine
 print Q "## submitted with:\n";       # treats specially.
-$qsub_cmd .= "-o $queue_logfile $qsub_opts $queue_array_opt $queue_scriptfile >>$queue_logfile 2>&1";
+$qsub_cmd .= "-o $queue_logfile $qsub_opts $queue_array_opt $queue_scriptfile >>$queue_logfile.pid 2>&1";
 print Q "# $qsub_cmd\n";
 if (!close(Q)) { # close was not successful... || die "Could not close script file $shfile";
   die "Failed to close the script file (full disk?)";
@@ -404,14 +415,14 @@ for (my $try = 1; $try < 5; $try++) {
   if ($ret != 0) {
     if ($sync && $ret == 256) { # this is the exit status when a job failed (bad exit status)
       if (defined $jobname) {
-        $logfile =~ s/\$SGE_TASK_ID/*/g;
+        $logfile =~ s/\$PBS_ARRAYID/*/g;
       }
       print STDERR "queue.pl: job writing to $logfile failed\n";
       exit(1);
     } else {
       print STDERR "queue.pl: Error submitting jobs to queue (return status was $ret)\n";
-      print STDERR "queue log file is $queue_logfile, command was $qsub_cmd\n";
-      my $err = `tail $queue_logfile`;
+      print STDERR "queue log file is $queue_logfile.pid, command was $qsub_cmd\n";
+      my $err = `tail $queue_logfile.pid`;
       print STDERR "Output of qsub was: $err\n";
       if ($err =~ m/gdi request/ || $err =~ m/qmaster/) {
         # When we get queue connectivity problems we usually see a message like:
@@ -445,12 +456,12 @@ if (! $sync) { # We're not submitting with -sync y, so we
   # We will need the sge_job_id, to check that job still exists
   { # This block extracts the numeric SGE job-id from the log file in q/.
     # It may be used later to query 'qstat' about the job.
-    open(L, "<$queue_logfile") || die "Error opening log file $queue_logfile";
+    open(L, "<$queue_logfile.pid") || die "Error opening log file $queue_logfile.pid";
     undef $sge_job_id;
     while (<L>) {
-      if (m/Your job\S* (\d+)[. ].+ has been submitted/) {
+      if (m/(\d+\[*\]*).*/) {
         if (defined $sge_job_id) {
-          die "Error: your job was submitted more than once (see $queue_logfile)";
+          die "Error: your job was submitted more than once (see $queue_logfile.pid)";
         } else {
           $sge_job_id = $1;
         }
@@ -458,7 +469,7 @@ if (! $sync) { # We're not submitting with -sync y, so we
     }
     close(L);
     if (!defined $sge_job_id) {
-      die "Error: log file $queue_logfile does not specify the SGE job-id.";
+      die "Error: log file $queue_logfile.pid does not specify the SGE job-id.";
     }
   }
   my $check_sge_job_ctr=1;
@@ -501,7 +512,7 @@ if (! $sync) { # We're not submitting with -sync y, so we
         # is designed to check every 10 waits at first, and eventually every 50
         # waits.
         if ( -f $f ) { next; }  #syncfile appeared: OK.
-        my $output = `qstat -j $sge_job_id 2>&1`;
+        my $output = `qstat -r $sge_job_id 2>&1`;
         my $ret = $?;
         if ($ret >> 8 == 1 && $output !~ m/qmaster/ &&
             $output !~ m/gdi request/) {
@@ -528,7 +539,7 @@ if (! $sync) { # We're not submitting with -sync y, so we
           $f =~ m/\.(\d+)$/ || die "Bad sync-file name $f";
           my $job_id = $1;
           if (defined $jobname) {
-            $logfile =~ s/\$SGE_TASK_ID/$job_id/g;
+            $logfile =~ s/\$PBS_ARRAYID/$job_id/g;
           }
           my $last_line = `tail -n 1 $logfile`;
           if ($last_line =~ m/status 0$/ && (-M $logfile) < 0) {
@@ -552,7 +563,7 @@ if (! $sync) { # We're not submitting with -sync y, so we
             exit(1);
           }
         } elsif ($ret != 0) {
-          print STDERR "queue.pl: Warning: qstat command returned status $ret (qstat -j $sge_job_id,$!)\n";
+          print STDERR "queue.pl: Warning: qstat command returned status $ret (qstat -r $sge_job_id,$!)\n";
           print STDERR "queue.pl: output was: $output";
         }
       }
@@ -571,7 +582,7 @@ if (!defined $jobname) { # not an array job.
 } else {
   for (my $jobid = $jobstart; $jobid <= $jobend; $jobid++) {
     my $l = $logfile;
-    $l =~ s/\$SGE_TASK_ID/$jobid/g;
+    $l =~ s/\$PBS_ARRAYID/$jobid/g;
     push @logfiles, $l;
   }
 }
@@ -610,13 +621,13 @@ foreach my $l (@logfiles) {
 if ($num_failed == 0) { exit(0); }
 else { # we failed.
   if (@logfiles == 1) {
-    if (defined $jobname) { $logfile =~ s/\$SGE_TASK_ID/$jobstart/g; }
+    if (defined $jobname) { $logfile =~ s/\$PBS_ARRAYID/$jobstart/g; }
     print STDERR "queue.pl: job failed with status $status, log is in $logfile\n";
     if ($logfile =~ m/JOB/) {
       print STDERR "queue.pl: probably you forgot to put JOB=1:\$nj in your script.\n";
     }
   } else {
-    if (defined $jobname) { $logfile =~ s/\$SGE_TASK_ID/*/g; }
+    if (defined $jobname) { $logfile =~ s/\$PBS_ARRAYID/*/g; }
     my $numjobs = 1 + $jobend - $jobstart;
     print STDERR "queue.pl: $num_failed / $numjobs failed, log is in $logfile\n";
   }

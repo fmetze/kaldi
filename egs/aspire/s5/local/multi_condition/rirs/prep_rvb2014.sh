@@ -32,9 +32,9 @@ if [ "$download" = true ]; then
   mkdir -p $RIR_home
   (cd $RIR_home;
   rm -rf reverb_tools*.tgz
-  wget http://reverb2014.dereverberation.com/tools/reverb_tools_for_Generate_mcTrainData.tgz || exit 1;
+  wget --no-check-certificate http://reverb2014.dereverberation.com/tools/reverb_tools_for_Generate_mcTrainData.tgz || exit 1;
   tar -zxvf reverb_tools_for_Generate_mcTrainData.tgz
-  wget http://reverb2014.dereverberation.com/tools/reverb_tools_for_Generate_SimData.tgz || exit 1;
+  wget --no-check-certificate http://reverb2014.dereverberation.com/tools/reverb_tools_for_Generate_SimData.tgz || exit 1;
   tar -zxvf reverb_tools_for_Generate_SimData.tgz >/dev/null
   )
 fi

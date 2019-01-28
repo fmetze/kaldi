@@ -82,10 +82,12 @@ fi
 
 if [ $stage -le 0 ]; then
 
-  find $links/fe_03_p1_tran/data $links/fe_03_p2_tran/data -name '*.txt'  > $tmpdir/transcripts.flist
+    find $links/fe_03_p1_tran/data $links/fe_03_p2_tran/data \
+	 $links/fe_03_p1_tran/DATA $links/fe_03_p2_tran/DATA \
+	 -name '*.txt' -or -name '*.TXT' > $tmpdir/transcripts.flist
 
   for dir in fe_03_p{1,2}_sph{1,2,3,4,5,6,7}; do
-    find $links/$dir/ -name '*.sph'
+    find $links/$dir/ -name '*.sph' -or -name '*.SPH'
   done > $tmpdir/sph.flist
 
   n=`cat $tmpdir/transcripts.flist | wc -l`
@@ -119,14 +121,14 @@ if [ $stage -le 1 ]; then
    open(T, ">$tmpdir/text.1") || die "Opening text output";
    while (<F>) {
      $file = $_;
-     m:([^/]+)\.txt: || die "Bad filename $_";
-     $call_id = $1;
+     m:([^/]+)\.(txt|TXT): || die "Bad filename $_";
+     $call_id = lc $1;
      print R "$call_id-A $call_id A\n";
      print R "$call_id-B $call_id B\n"; 
      open(I, "<$file") || die "Opening file $_";
 
      $line1 = <I>;
-     $line1 =~ m/# (.+)\.sph/ || die "Bad first line $line1 in file $file";
+     $line1 =~ m/# (.+)\.(sph|SPH)/ || die "Bad first line $line1 in file $file";
      $call_id eq $1 || die "Mismatch call-id $call_id vs $1\n";
      while (<I>) {
        if (m/([0-9.]+)\s+([0-9.]+) ([AB]):\s*(\S.+\S|\S)\s*$/) {
@@ -170,7 +172,7 @@ if [ $stage -le 3 ]; then
     utils/make_absolute.sh $f
   done > $tmpdir/sph_abs.flist
   
-  cat $tmpdir/sph_abs.flist | perl -ane 'm:/([^/]+)\.sph$: || die "bad line $_; ";  print "$1 $_"; ' > $tmpdir/sph.scp
+  cat $tmpdir/sph_abs.flist | perl -ane 'm:/([^/]+)\.(sph|SPH)$: || die "bad line $_; "; $l=lc $1; print "$l $_"; ' > $tmpdir/sph.scp
   cat $tmpdir/sph.scp | awk -v sph2pipe=$sph2pipe '{printf("%s-A %s -f wav -p -c 1 %s |\n", $1, sph2pipe, $2); 
     printf("%s-B %s -f wav -p -c 2 %s |\n", $1, sph2pipe, $2);}' | \
     sort -k1,1 -u  > data/train_all/wav.scp || exit 1;
@@ -181,9 +183,10 @@ if [ $stage -le 4 ]; then
   # file formats
   # The files "filetable2fe_03_p2_sph1 fe_03_05852.sph ff
   cat $links/fe_03_p1_sph{1,2,3,4,5,6,7}/filetable.txt \
-    $links/fe_03_p2_sph{1,2,3,4,5,6,7}/docs/filetable2.txt | \
+      $links/fe_03_p1_sph{1,2,3,4,5,6,7}/FILETABLE.TXT \
+      $links/fe_03_p2_sph{1,2,3,4,5,6,7}/docs/filetable2.txt | \
   perl -ane 'm:^\S+ (\S+)\.sph ([fm])([fm]): || die "bad line $_;"; print "$1-A $2\n", "$1-B $3\n"; ' | \
-   sort | uniq | utils/filter_scp.pl data/train_all/spk2utt > data/train_all/spk2gender
+  sort | uniq | utils/filter_scp.pl data/train_all/spk2utt > data/train_all/spk2gender
 
   if [ ! -s data/train_all/spk2gender ]; then
     echo "It looks like our first try at getting the spk2gender info did not work."

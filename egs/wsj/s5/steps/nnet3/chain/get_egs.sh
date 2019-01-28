@@ -322,7 +322,7 @@ if [ $stage -le 2 ]; then
       "$lats_rspecifier" \
       ark,scp:$dir/lat_special.JOB.ark,$dir/lat_special.JOB.scp || exit 1
 
-    for id in $(seq $nj); do cat $dir/lat_special.$id.scp; done > $dir/lat_special.scp
+    for id in $(seq $nj); do cat $dir/lat_special.$id.scp; done | sort > $dir/lat_special.scp
 
     $cmd $dir/log/create_valid_subset.log \
       utils/filter_scp.pl $dir/valid_uttlist $dir/lat_special.scp \| \

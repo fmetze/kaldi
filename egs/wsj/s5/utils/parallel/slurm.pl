@@ -62,6 +62,7 @@ my $sync = 0;
 my $num_threads = 1;
 my $max_jobs_run;
 my $gpu = 0;
+my $cmd_wrapper = "";
 
 my $config = "conf/slurm.conf";
 
@@ -220,13 +221,16 @@ while(<CONFIG>) {
   if ($_ =~ /^command (.+)/) {
     $read_command = 1;
     $qsub_cmd = $1 . " ";
+  } elsif ($_ =~ m/^wrapper (.+)/) {
+      # This is a wrapper around the command (e.g. for singularity)
+      $cmd_wrapper = $1;
   } elsif ($_ =~ m/^option ([^=]+)=\* (.+)$/) {
     # Config option that needs replacement with parameter value read from CLI
     # e.g.: option mem=* -l mem_free=$0,ram_free=$0
     my $option = $1;     # mem
     my $arg= $2;         # -l mem_free=$0,ram_free=$0
     if ($arg !~ m:\$0:) {
-      print STDERR "Warning: the line '$line' in config file ($config) does not substitution variable \$0\n";
+      print STDERR "Warning: the line '$line' in config file ($config) does not substitute variable \$0\n";
     }
     if (exists $cli_options{$option}) {
       # Replace $0 with the argument read from command line.
@@ -385,6 +389,7 @@ print Q "#!/bin/bash\n";
 print Q "cd $cwd\n";
 print Q ". ./path.sh\n";
 print Q "( echo '#' Running on \`hostname\`\n";
+print Q "  [ -n \${SINGULARITY_NAME+X} ] && echo '# Container' \$SINGULARITY_NAME\n";
 print Q "  echo '#' Started at \`date\`\n";
 print Q "  set | grep SLURM | while read line; do echo \"# \$line\"; done\n";
 print Q "  echo -n '# '; cat <<EOF\n";
@@ -397,6 +402,7 @@ print Q "  )>>$logfile\n";
 print Q "  unset CUDA_VISIBLE_DEVICES\n";
 print Q "fi\n";
 print Q "time1=\`date +\"%s\"\`\n";
+print Q "[ -n \${SINGULARITY_NAME+X} ] && . ./path-singularity.sh\n";
 print Q " ( $cmd ) &>>$logfile\n";
 print Q "ret=\$?\n";
 print Q "sync || true\n";
@@ -414,11 +420,12 @@ if ($array_job == 0) { # not an array job
 }
 print Q "exit \$[\$ret ? 1 : 0]\n"; # avoid status 100 which grid-engine
 print Q "## submitted with:\n";       # treats specially.
-$qsub_cmd .= " $qsub_opts --open-mode=append -e ${queue_logfile} -o ${queue_logfile} $queue_array_opt $queue_scriptfile >>$queue_logfile 2>&1";
+$qsub_cmd .= " $qsub_opts --open-mode=append -e ${queue_logfile} -o ${queue_logfile} $queue_array_opt $cmd_wrapper $queue_scriptfile >>$queue_logfile 2>&1";
 print Q "# $qsub_cmd\n";
 if (!close(Q)) { # close was not successful... || die "Could not close script file $shfile";
   die "Failed to close the script file (full disk?)";
 }
+chmod 0700, $queue_scriptfile;
 
 my $ret = system ($qsub_cmd);
 if ($ret != 0) {

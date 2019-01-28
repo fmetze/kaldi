@@ -29,11 +29,12 @@ echo "$0 $@"  # Print the command line for logging
 . ./utils/parse_options.sh
 
 if ! cuda-compiled; then
-  cat <<EOF && exit 1
+  cat <<EOF
 This script is intended to be used with GPUs but you have not compiled Kaldi with CUDA
 If you want to use GPUs (and have them), go to src/, and configure and make on a machine
 where "nvcc" is installed.
 EOF
+  # && exit 1
 fi
 
 ali_dir=exp/tri5a_rvb_ali
@@ -79,19 +80,20 @@ if [ $stage -le 9 ]; then
   steps/compute_cmvn_stats.sh data/train_rvb_min${min_seg_len}_hires exp/make_reverb_hires/train_rvb_min${min_seg_len} mfcc_reverb || exit 1;
 
   #extract ivectors for the new data
-  steps/online/nnet2/copy_data_dir.sh --utts-per-spk-max 2 \
+  #   steps/online/nnet2/copy_data_dir.sh --utts-per-spk-max 2
+  utils/data/modify_speaker_info.sh --utts-per-spk-max 2 \
     data/train_rvb_min${min_seg_len}_hires data/train_rvb_min${min_seg_len}_hires_max2
   ivectordir=exp/nnet3/ivectors_train_min${min_seg_len}
   if [[ $(hostname -f) == *.clsp.jhu.edu ]]; then # this shows how you can split across multiple file-systems.
     utils/create_split_dir.pl /export/b0{1,2,3,4}/$USER/kaldi-data/egs/aspire/s5/$ivectordir/storage $ivectordir/storage
   fi
 
-  steps/online/nnet2/extract_ivectors_online.sh --cmd "$train_cmd" --nj 200 \
+  steps/online/nnet2/extract_ivectors_online.sh --cmd "$train_cmd" --nj 40 \
     data/train_rvb_min${min_seg_len}_hires_max2 \
     exp/nnet3/extractor $ivectordir || exit 1;
 
- # combine the non-hires features for alignments/lattices
- rm -rf data/${latgen_train_set}_min${min_seg_len}
+  # combine the non-hires features for alignments/lattices
+  rm -rf data/${latgen_train_set}_min${min_seg_len}
   utt_prefix="THISISUNIQUESTRING_"
   spk_prefix="THISISUNIQUESTRING_"
   utils/copy_data_dir.sh --spk-prefix "$spk_prefix" --utt-prefix "$utt_prefix" \
@@ -210,6 +212,8 @@ if [ $stage -le 12 ]; then
     --tree-dir $treedir \
     --lat-dir exp/tri5a_rvb_min${min_seg_len}_lats \
     --dir $dir  || exit 1;
+  # --use-gpu=wait
+  # sudo nvidia-smi -c 3
 fi
 
 if [ $stage -le 13 ]; then
