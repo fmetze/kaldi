@@ -13,6 +13,7 @@ stage=1
 train_stage=-10
 use_gpu=true
 dir=exp/nnet2_multicondition/nnet_ms_a
+mfcc_reverb=mfcc_reverb
 
 set -e
 . ./cmd.sh
@@ -51,7 +52,7 @@ else
 fi
 
 # do the common parts of the script.
-local/multi_condition/run_nnet2_common.sh --stage $stage
+local/multi_condition/run_nnet2_common.sh --stage $stage --mfcc-reverb $mfcc_reverb
 
 
 if [ $stage -le 7 ]; then

@@ -6,8 +6,6 @@
 # see ../run.sh for example
 
 # Compute cepstral mean and variance statistics per speaker.
-# We do this in just one job; it's fast.
-# This script takes no options.
 #
 # Note: there is no option to do CMVN per utterance.  The idea is
 # that if you did it per utterance it would not make sense to do
@@ -20,24 +18,15 @@
 
 echo "$0 $@"  # Print the command line for logging
 
+nj=1
+cmd=run.pl
 fake=false   # If specified, can generate fake/dummy CMVN stats (that won't normalize)
 fake_dims=   # as the "fake" option, but you can generate "fake" stats only for certain
              # dimensions.
 two_channel=false
 
-if [ "$1" == "--fake" ]; then
-  fake=true
-  shift
-fi
-if [ "$1" == "--fake-dims" ]; then
-  fake_dims=$2
-  shift
-  shift
-fi
-if [ "$1" == "--two-channel" ]; then
-  two_channel=true
-  shift
-fi
+if [ -f path.sh ]; then . ./path.sh; fi
+. parse_options.sh || exit 1;
 
 if [ $# -lt 1 ] || [ $# -gt 3 ]; then
    echo "Usage: $0 [options] <data-dir> [<log-dir> [<cmvn-dir>] ]";
@@ -52,8 +41,6 @@ if [ $# -lt 1 ] || [ $# -gt 3 ]; then
    echo "                  dimensions (e.g. 13:14:15)"
    exit 1;
 fi
-
-if [ -f path.sh ]; then . ./path.sh; fi
 
 data=$1
 if [ $# -ge 2 ]; then
@@ -101,9 +88,20 @@ elif [ ! -z "$fake_dims" ]; then
     modify-cmvn-stats "$fake_dims" ark:- ark,scp:$cmvndir/cmvn_$name.ark,$cmvndir/cmvn_$name.scp && \
     echo "Error computing (partially fake) CMVN stats.  See $logdir/cmvn_$name.log" && exit 1;
 else
+  if [ $nj -eq 1 ]; then
   ! compute-cmvn-stats --spk2utt=ark:$data/spk2utt scp:$data/feats.scp ark,scp:$cmvndir/cmvn_$name.ark,$cmvndir/cmvn_$name.scp \
     2> $logdir/cmvn_$name.log && echo "Error computing CMVN stats. See $logdir/cmvn_$name.log" && exit 1;
+  else
+    utils/split_data.sh $data $nj
+    $cmd JOB=1:$nj $logdir/cmvn_${name}.JOB.log \
+      compute-cmvn-stats --spk2utt=ark:$data/split$nj/JOB/spk2utt scp:$data/split$nj/JOB/feats.scp ark,scp:$cmvndir/cmvn_$name.JOB.ark,$cmvndir/cmvn_$name.JOB.scp || exit 1;
+    cat $cmvndir/cmvn_$name.[0-9]*.scp | sort > $cmvndir/cmvn_$name.scp
+    # This is a data directory, so there should not be any stray files ...
+    rm $cmvndir/cmvn_$name.[0-9]*.scp
+    rm -rf $data/split$nj
+  fi
 fi
+
 
 cp $cmvndir/cmvn_$name.scp $data/cmvn.scp || exit 1;
 

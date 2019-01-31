@@ -10,9 +10,10 @@ background_snrs="20:10:15:5:0"
 num_data_reps=3
 ali_dir=exp/
 db_string="'air' 'rwcp' 'rvb2014'" # RIR dbs to be used in the experiment
-                                      # only dbs used for ASpIRE submission system have been used here
+                                   # only dbs used for ASpIRE submission system have been used here
 RIR_home=db/RIR_databases/ # parent directory of the RIR databases files
 download_rirs=true # download the RIR databases from the urls or assume they are present in the RIR_home directory
+mfcc_reverb=mfcc_reverb
 
 set -e
 . ./cmd.sh
@@ -24,8 +25,9 @@ local/multi_condition/check_version.sh || exit 1;
 
 mkdir -p exp/nnet2_multicondition
 if [ $stage -le 1 ]; then
-  # prepare the impulse responses
-  local/multi_condition/prepare_impulses_noises.sh --log-dir exp/make_reverb/log \
+  # prepare the impulse responses (if not already done)
+  [ -d $RIR_home -o -L $RIR_home ] || local/multi_condition/prepare_impulses_noises.sh \
+    --log-dir exp/make_reverb/log \
     --db-string "$db_string" \
     --download-rirs $download_rirs \
     --RIR-home $RIR_home \
@@ -33,7 +35,8 @@ if [ $stage -le 1 ]; then
     
   # Generate the rir_list and noise_list for the reverberate_data_dir.py to corrupt the data
   # this script just assumes air rwcp rvb2014 databases
-  python local/multi_condition/aspire_prep_rir_noise_list.py data/impulses_noises data/impulses_noises/info
+  [ -d data/impulses_noises/info -o -L data/impulses_noises/info ] || \
+    python local/multi_condition/aspire_prep_rir_noise_list.py data/impulses_noises data/impulses_noises/info
 
   # corrupt the fisher data to generate multi-condition data
   for data_dir in train dev test; do
@@ -42,7 +45,7 @@ if [ $stage -le 1 ]; then
     else
       num_reps=1
     fi
-    python steps/data/reverberate_data_dir.py \
+    $train_cmd exp/reverberate/${data_dir}.log python steps/data/reverberate_data_dir.py \
       --prefix "rev" \
       --rir-list-file data/impulses_noises/info/rir_list \
       --noise-list-file data/impulses_noises/info/noise_list \
@@ -54,6 +57,7 @@ if [ $stage -le 1 ]; then
       --num-replications $num_reps \
       --max-noises-per-minute 1 \
       --random-seed 1 \
+      --cmd "$train_cmd" --nj 30 \
       data/${data_dir} data/${data_dir}_rvb
   done
 
@@ -70,7 +74,7 @@ if [ $stage -le 1 ]; then
 fi
 
 if [ $stage -le 2 ]; then
-  mfccdir=mfcc_reverb
+  mfccdir=$mfcc_reverb
   if [[ $(hostname -f) == *.clsp.jhu.edu ]] && [ ! -d $mfccdir/storage ]; then
     date=$(date +'%m_%d_%H_%M')
     utils/create_split_dir.pl /export/b0{1,2,3,4}/$USER/kaldi-data/egs/fisher_english_reverb-$date/s5/$mfccdir/storage $mfccdir/storage
@@ -80,7 +84,8 @@ if [ $stage -le 2 ]; then
     steps/make_mfcc.sh --nj 70 --mfcc-config conf/mfcc_hires.conf \
         --cmd "$train_cmd" data/${data_dir}_hires \
         exp/make_reverb_hires/${data_dir} $mfccdir || exit 1;
-    steps/compute_cmvn_stats.sh data/${data_dir}_hires exp/make_reverb_hires/${data_dir} $mfccdir || exit 1;
+    steps/compute_cmvn_stats.sh --nj 30 --cmd "$train_cmd" \
+        data/${data_dir}_hires exp/make_reverb_hires/${data_dir} $mfccdir || exit 1;
     utils/fix_data_dir.sh data/${data_dir}_hires
     utils/validate_data_dir.sh data/${data_dir}_hires
   done

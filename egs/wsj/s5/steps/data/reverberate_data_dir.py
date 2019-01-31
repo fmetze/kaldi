@@ -50,6 +50,8 @@ def GetArgs():
     parser.add_argument('--random-seed', type=int, default=0, help='seed to be used in the randomization of impulses and noises')
     parser.add_argument("--shift-output", type=str, help="If true, the reverberated waveform will be shifted by the amount of the peak position of the RIR",
                          choices=['true', 'false'], default = "true")
+    parser.add_argument('--cmd', type=str, default='run.pl', help='The command to use for parallelization.')
+    parser.add_argument('--nj', type=int, default=1, help='The number of parallel jobs.')
     parser.add_argument("input_dir",
                         help="Input data directory")
     parser.add_argument("output_dir",
@@ -365,12 +367,19 @@ def CreateReverberatedCopy(input_dir,
                            shift_output, # option whether to shift the output waveform
                            isotropic_noise_addition_probability, # Probability of adding isotropic noises
                            pointsource_noise_addition_probability, # Probability of adding point-source noises
-                           max_noises_per_minute  # maximum number of point-source noises that can be added to a recording according to its duration
-                           ):
+                           max_noises_per_minute,  # maximum number of point-source noises that can be added to a recording according to its duration
+                           nj, cmd):
 
     if not os.path.isfile(input_dir + "/reco2dur"):
         print("Getting the duration of the recordings...");
-        data_lib.RunKaldiCommand("wav-to-duration --read-entire-file=true scp:{0}/wav.scp ark,t:{0}/reco2dur".format(input_dir))
+        if nj == 1:
+            data_lib.RunKaldiCommand("wav-to-duration --read-entire-file=true scp:{0}/wav.scp ark,t:{0}/reco2dur".format(input_dir))
+        else:
+            data_lib.RunKaldiCommand("utils/split_data.sh {0} {1}".format(input_dir, nj))
+            data_lib.RunKaldiCommand('{2} JOB=1:{1} {0}/reco2dur.JOB.log wav-to-duration --read-entire-file=true scp:{0}/split{1}/JOB/wav.scp ark,t:{0}/reco2dur.JOB'.format(input_dir, nj, cmd))
+            data_lib.RunKaldiCommand('cat {0}/reco2dur.[0-9]* | sort > {0}/reco2dur'.format(input_dir))
+            # This is a data directory, so there should not be any stray files left ...
+            data_lib.RunKaldiCommand('rm {0}/reco2dur.[0-9]* {0}/reco2dur.[0-9]*.log'.format(input_dir))
     durations = ParseFileToDict(input_dir + "/reco2dur", value_processor = lambda x: float(x[0]))
     wav_scp = ParseFileToDict(input_dir + "/wav.scp", value_processor = lambda x: " ".join(x))
     foreground_snr_array = map(lambda x: float(x), foreground_snr_string.split(':'))
@@ -545,7 +554,8 @@ def Main():
                            shift_output = args.shift_output,
                            isotropic_noise_addition_probability = args.isotropic_noise_addition_probability,
                            pointsource_noise_addition_probability = args.pointsource_noise_addition_probability,
-                           max_noises_per_minute = args.max_noises_per_minute)
+                           max_noises_per_minute = args.max_noises_per_minute,
+                           nj=args.nj, cmd=args.cmd)
 
 if __name__ == "__main__":
     Main()

@@ -9,6 +9,7 @@ foreground_snrs="20:10:15:5:0"
 background_snrs="20:10:15:5:0"
 num_data_reps=3
 base_rirs="simulated"
+mfcc_reverb=mfcc_reverb
 
 set -e
 . ./cmd.sh
@@ -61,7 +62,7 @@ fi
 
 
 if [ $stage -le 2 ]; then
-  mfccdir=mfcc_reverb
+  mfccdir=$mfcc_reverb
   if [[ $(hostname -f) == *.clsp.jhu.edu ]] && [ ! -d $mfccdir/storage ]; then
     date=$(date +'%m_%d_%H_%M')
     utils/create_split_dir.pl /export/b0{1,2,3,4}/$USER/kaldi-data/mfcc/aspire-$date/s5/$mfccdir/storage $mfccdir/storage
@@ -72,7 +73,8 @@ if [ $stage -le 2 ]; then
     steps/make_mfcc.sh --nj 70 --mfcc-config conf/mfcc_hires.conf \
         --cmd "$train_cmd" data/${data_dir}_hires \
         exp/make_reverb_hires/${data_dir} $mfccdir || exit 1;
-    steps/compute_cmvn_stats.sh data/${data_dir}_hires exp/make_reverb_hires/${data_dir} $mfccdir || exit 1;
+    steps/compute_cmvn_stats.sh --nj 30 --cmd "$train_cmd" \
+        data/${data_dir}_hires exp/make_reverb_hires/${data_dir} $mfccdir || exit 1;
     utils/fix_data_dir.sh data/${data_dir}_hires
     utils/validate_data_dir.sh data/${data_dir}_hires
   done
