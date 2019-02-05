@@ -16,7 +16,7 @@ num_epochs=4
 remove_egs=false
 common_egs_dir=
 num_data_reps=3
-
+mfcc_reverb=mfcc_reverb
 
 min_seg_len=
 xent_regularize=0.1
@@ -40,12 +40,13 @@ fi
 ali_dir=exp/tri5a_rvb_ali
 treedir=exp/chain/tri6_tree_11000
 lang=data/lang_chain
+mfcc_reverb=mfcc_reverb
 
 
 # The iVector-extraction and feature-dumping parts are the same as the standard
 # nnet3 setup, and you can skip them by setting "--stage 8" if you have already
 # run those things.
-local/nnet3/run_ivector_common.sh --stage $stage --num-data-reps 3|| exit 1;
+local/nnet3/run_ivector_common.sh --stage $stage --num-data-reps 3 --mfcc-reverb $mfcc_reverb || exit 1;
 
 if [ $stage -le 7 ]; then
   # Create a version of the lang/ directory that has one state per phone in the
@@ -73,11 +74,13 @@ if [ -z $min_seg_len ]; then
   min_seg_len=$(python -c "print ($frames_per_eg+5)/100.0")
 fi
 
+lnj=40
 if [ $stage -le 9 ]; then
   rm -rf data/train_rvb_min${min_seg_len}_hires
   utils/data/combine_short_segments.sh \
       data/train_rvb_hires $min_seg_len data/train_rvb_min${min_seg_len}_hires
-  steps/compute_cmvn_stats.sh data/train_rvb_min${min_seg_len}_hires exp/make_reverb_hires/train_rvb_min${min_seg_len} mfcc_reverb || exit 1;
+  steps/compute_cmvn_stats.sh --cmd "$train_cmd" --nj 30 \
+      data/train_rvb_min${min_seg_len}_hires exp/make_reverb_hires/train_rvb_min${min_seg_len} $mfcc_reverb || exit 1;
 
   #extract ivectors for the new data
   #   steps/online/nnet2/copy_data_dir.sh --utts-per-spk-max 2
@@ -88,7 +91,7 @@ if [ $stage -le 9 ]; then
     utils/create_split_dir.pl /export/b0{1,2,3,4}/$USER/kaldi-data/egs/aspire/s5/$ivectordir/storage $ivectordir/storage
   fi
 
-  steps/online/nnet2/extract_ivectors_online.sh --cmd "$train_cmd" --nj 40 \
+  steps/online/nnet2/extract_ivectors_online.sh --cmd "$train_cmd" --nj $lnj \
     data/train_rvb_min${min_seg_len}_hires_max2 \
     exp/nnet3/extractor $ivectordir || exit 1;
 
@@ -100,38 +103,40 @@ if [ $stage -le 9 ]; then
     data/train data/train_temp_for_lats
   utils/data/combine_short_segments.sh \
       data/train_temp_for_lats $min_seg_len data/train_min${min_seg_len}
-  steps/compute_cmvn_stats.sh data/train_min${min_seg_len} || exit 1;
+  steps/compute_cmvn_stats.sh --cmd "$train_cmd" --nj 30 \
+      data/train_min${min_seg_len} || exit 1;
 fi
 
 if [ $stage -le 10 ]; then
   # Get the alignments as lattices (gives the chain training more freedom).
   # use the same num-jobs as the alignments
-  nj=200
+  #nj=200
   lat_dir=exp/tri5a_min${min_seg_len}_lats
-  steps/align_fmllr_lats.sh --nj $nj --cmd "$train_cmd" data/train_min${min_seg_len} \
+  steps/align_fmllr_lats.sh --nj $lnj --cmd "$train_cmd" data/train_min${min_seg_len} \
     data/lang exp/tri5a $lat_dir
   rm -f $lat_dir/fsts.*.gz # save space
 
   rvb_lat_dir=exp/tri5a_rvb_min${min_seg_len}_lats
-  mkdir -p $rvb_lat_dir/temp/
-  lattice-copy "ark:gunzip -c $lat_dir/lat.*.gz |" ark,scp:$rvb_lat_dir/temp/lats.ark,$rvb_lat_dir/temp/lats.scp
+  mkdir -p $rvb_lat_dir
+  rvb_lat_dir_temp=`mktemp -d`
+  lattice-copy "ark:gunzip -c $lat_dir/lat.*.gz |" ark,scp:$rvb_lat_dir_temp/lats.ark,$rvb_lat_dir_temp/lats.scp
 
   # copy the lattices for the reverberated data
-  rm -f $rvb_lat_dir/temp/combined_lats.scp
-  touch $rvb_lat_dir/temp/combined_lats.scp
+  rm -f $rvb_lat_dir_temp/combined_lats.scp
+  touch $rvb_lat_dir_temp/combined_lats.scp
   for i in `seq 1 $num_data_reps`; do
-    cat $rvb_lat_dir/temp/lats.scp | sed -e "s/THISISUNIQUESTRING/rev${i}/g" >> $rvb_lat_dir/temp/combined_lats.scp
+    cat $rvb_lat_dir_temp/lats.scp | sed -e "s/THISISUNIQUESTRING/rev${i}/g" >> $rvb_lat_dir_temp/combined_lats.scp
   done
-  sort -u $rvb_lat_dir/temp/combined_lats.scp > $rvb_lat_dir/temp/combined_lats_sorted.scp
+  sort -u $rvb_lat_dir_temp/combined_lats.scp > $rvb_lat_dir_temp/combined_lats_sorted.scp
 
-  lattice-copy scp:$rvb_lat_dir/temp/combined_lats_sorted.scp "ark:|gzip -c >$rvb_lat_dir/lat.1.gz" || exit 1;
+  lattice-copy scp:$rvb_lat_dir_temp/combined_lats_sorted.scp "ark:|gzip -c >$rvb_lat_dir/lat.1.gz" || exit 1;
   echo "1" > $rvb_lat_dir/num_jobs
+  rm -rf $rvb_lat_dir_temp
 
   # copy other files from original lattice dir
   for f in cmvn_opts final.mdl splice_opts tree; do
     cp $lat_dir/$f $rvb_lat_dir/$f
   done
-
 fi
 
 if [ $stage -le 11 ]; then
@@ -184,6 +189,7 @@ if [ $stage -le 12 ]; then
      /export/b0{5,6,7,8}/$USER/kaldi-data/egs/aspire-$(date +'%m_%d_%H_%M')/s5c/$dir/egs/storage $dir/egs/storage
   fi
 
+  mkdir -p $dir/egs
   touch $dir/egs/.nodelete # keep egs around when that run dies.
 
   steps/nnet3/chain/train.py --stage $train_stage \
@@ -211,7 +217,7 @@ if [ $stage -le 12 ]; then
     --feat-dir data/train_rvb_min${min_seg_len}_hires \
     --tree-dir $treedir \
     --lat-dir exp/tri5a_rvb_min${min_seg_len}_lats \
-    --dir $dir  || exit 1;
+    --dir $dir --use-gpu=wait || exit 1;
   # --use-gpu=wait
   # sudo nvidia-smi -c 3
 fi

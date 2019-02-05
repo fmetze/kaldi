@@ -69,12 +69,13 @@ dir=exp/chain/tdnn_lstm${tdnn_affix}
 train_data_dir=data/${train_set}_hires
 train_ivector_dir=exp/nnet3/ivectors_${train_set}
 lang=data/lang_chain
+mfcc_reverb=mfcc_reverb
 
 
 # The iVector-extraction and feature-dumping parts are the same as the standard
 # nnet3 setup, and you can skip them by setting "--stage 8" if you have already
 # run those things.
-local/nnet3/run_ivector_common.sh --stage $stage --num-data-reps 3 || exit 1
+local/nnet3/run_ivector_common.sh --stage $stage --num-data-reps 3 --mfcc-reverb $mfcc_reverb || exit 1
 
 mkdir -p $dir
 
