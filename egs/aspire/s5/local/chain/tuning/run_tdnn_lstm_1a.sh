@@ -298,7 +298,7 @@ if [ $stage -le 16 ]; then
    --pass2-decode-opts "--min-active 1000" \
    dev_aspire data/lang $dir/graph_pp $dir
 fi
-exit
+
 if [ $stage -le 17 ]; then
   # %WER 24.0 | 2083 25820 | 79.9 12.0 8.1 4.0 24.0 71.8 | -0.444 | exp/chain/tdnn_lstm_1a_online/decode_dev_aspire_uniformsegmented_v9_pp_fg/score_10/penalty_0.0/ctm.filt.filt.sys
   local/nnet3/decode_online.sh --stage $test_stage --decode-num-jobs 30 --affix "v9" \
