@@ -70,7 +70,7 @@ if [ $stage -le 2 ]; then
 
   for data_dir in train_rvb dev_rvb test_rvb dev_aspire dev test ; do
     utils/copy_data_dir.sh data/$data_dir data/${data_dir}_hires
-    steps/make_mfcc.sh --nj 70 --mfcc-config conf/mfcc_hires.conf \
+    steps/make_mfcc.sh --nj 40 --mfcc-config conf/mfcc_hires.conf \
         --cmd "$train_cmd" data/${data_dir}_hires \
         exp/make_reverb_hires/${data_dir} $mfccdir || exit 1;
     steps/compute_cmvn_stats.sh --nj 30 --cmd "$train_cmd" \
@@ -118,6 +118,6 @@ if [ $stage -le 6 ]; then
   steps/online/nnet2/copy_data_dir.sh --utts-per-spk-max 2 \
     data/train_rvb_hires data/train_rvb_hires_max2
 
-  steps/online/nnet2/extract_ivectors_online.sh --cmd "$train_cmd" --nj 60 \
+  steps/online/nnet2/extract_ivectors_online.sh --cmd "$train_cmd" --nj 40 \
     data/train_rvb_hires_max2 exp/nnet3/extractor $ivectordir || exit 1;
 fi

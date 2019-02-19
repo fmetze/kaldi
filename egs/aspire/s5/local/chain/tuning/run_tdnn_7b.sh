@@ -12,6 +12,7 @@ dir=exp/chain/tdnn_7b
 decode_iter=
 
 # training options
+use_gpu=yes # true, false, wait
 num_epochs=4
 remove_egs=false
 common_egs_dir=
@@ -21,6 +22,7 @@ mfcc_reverb=mfcc_reverb
 min_seg_len=
 xent_regularize=0.1
 frames_per_eg=150
+lat_num_jobs=1
 # End configuration section.
 echo "$0 $@"  # Print the command line for logging
 
@@ -118,7 +120,11 @@ if [ $stage -le 10 ]; then
 
   rvb_lat_dir=exp/tri5a_rvb_min${min_seg_len}_lats
   mkdir -p $rvb_lat_dir
-  rvb_lat_dir_temp=`mktemp -d`
+  if [ $lat_num_jobs -eq 1 || "$cmd" = "run.pl" ]; then
+      rvb_lat_dir_temp=`mktemp -d`
+  else
+      rvb_lat_dir_temp=${rvb_lat_dir}_temp
+  fi
   lattice-copy "ark:gunzip -c $lat_dir/lat.*.gz |" ark,scp:$rvb_lat_dir_temp/lats.ark,$rvb_lat_dir_temp/lats.scp
 
   # copy the lattices for the reverberated data
@@ -129,8 +135,13 @@ if [ $stage -le 10 ]; then
   done
   sort -u $rvb_lat_dir_temp/combined_lats.scp > $rvb_lat_dir_temp/combined_lats_sorted.scp
 
+  if [ $lat_num_jobs -eq 1 ]; then
   lattice-copy scp:$rvb_lat_dir_temp/combined_lats_sorted.scp "ark:|gzip -c >$rvb_lat_dir/lat.1.gz" || exit 1;
-  echo "1" > $rvb_lat_dir/num_jobs
+  else
+      utils/split_data.sh data/train_rvb_min${min_seg_len}_hires $lat_num_jobs
+      $cmd JOB=1:$lat_num_jobs $dir/log/lattice_copy_back.JOB.log lattice-copy scp:"utils/filter_scp.pl data/train_rvb_min${min_seg_len}_hires/split${lat_num_jobs}/JOB/utt2spk $rvb_lat_dir_temp/combined_lats_sorted.scp |" "ark:|gzip -c >$rvb_lat_dir/lat.JOB.gz" || exit 1;
+  fi
+  echo $lat_num_jobs > $rvb_lat_dir/num_jobs
   rm -rf $rvb_lat_dir_temp
 
   # copy other files from original lattice dir
@@ -217,7 +228,7 @@ if [ $stage -le 12 ]; then
     --feat-dir data/train_rvb_min${min_seg_len}_hires \
     --tree-dir $treedir \
     --lat-dir exp/tri5a_rvb_min${min_seg_len}_lats \
-    --dir $dir --use-gpu=wait || exit 1;
+    --dir $dir --use-gpu=${use_gpu} || exit 1;
   # --use-gpu=wait
   # sudo nvidia-smi -c 3
 fi

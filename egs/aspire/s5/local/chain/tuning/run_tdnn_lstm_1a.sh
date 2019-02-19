@@ -1,6 +1,6 @@
 #!/bin/bash
 
-set -e
+#set -e
 
 # based on run_tdnn_7b.sh in the swbd recipe
 
@@ -17,15 +17,17 @@ stage=0
 train_stage=-10
 get_egs_stage=-10
 test_stage=1
-nj=70
+nj=40
 
 tdnn_affix=_1a
+mfcc_reverb=mfcc_reverb
 
 hidden_dim=1024
 cell_dim=1024
 projection_dim=256
 
 # training options
+use_gpu=yes # true, false, wait
 num_epochs=2
 minibatch_size=64,32
 chunk_left_context=40
@@ -69,7 +71,6 @@ dir=exp/chain/tdnn_lstm${tdnn_affix}
 train_data_dir=data/${train_set}_hires
 train_ivector_dir=exp/nnet3/ivectors_${train_set}
 lang=data/lang_chain
-mfcc_reverb=mfcc_reverb
 
 
 # The iVector-extraction and feature-dumping parts are the same as the standard
@@ -244,7 +245,7 @@ if [ $stage -le 13 ]; then
     --tree-dir $treedir \
     --lat-dir $lat_dir \
     --dir $dir \
-    --use-gpu=wait || exit 1;
+    --use-gpu=${use_gpu} || exit 1;
 fi
 
 graph_dir=$dir/graph_pp
@@ -297,7 +298,7 @@ if [ $stage -le 16 ]; then
    --pass2-decode-opts "--min-active 1000" \
    dev_aspire data/lang $dir/graph_pp $dir
 fi
-
+exit
 if [ $stage -le 17 ]; then
   # %WER 24.0 | 2083 25820 | 79.9 12.0 8.1 4.0 24.0 71.8 | -0.444 | exp/chain/tdnn_lstm_1a_online/decode_dev_aspire_uniformsegmented_v9_pp_fg/score_10/penalty_0.0/ctm.filt.filt.sys
   local/nnet3/decode_online.sh --stage $test_stage --decode-num-jobs 30 --affix "v9" \

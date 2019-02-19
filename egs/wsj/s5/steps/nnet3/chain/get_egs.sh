@@ -54,10 +54,10 @@ right_tolerance=  # chain right tolerance == max label delay.
 left_tolerance=
 
 stage=0
-max_jobs_run=15         # This should be set to the maximum number of nnet3-chain-get-egs jobs you are
+max_jobs_run=10         # This should be set to the maximum number of nnet3-chain-get-egs jobs you are
                         # comfortable to run in parallel; you can increase it if your disk
                         # speed is greater and you have more machines.
-max_shuffle_jobs_run=50  # the shuffle jobs now include the nnet3-chain-normalize-egs command,
+max_shuffle_jobs_run=20  # the shuffle jobs now include the nnet3-chain-normalize-egs command,
                          # which is fairly CPU intensive, so we can run quite a few at once
                          # without overloading the disks.
 srand=0     # rand seed for nnet3-chain-get-egs, nnet3-chain-copy-egs and nnet3-chain-shuffle-egs
@@ -389,7 +389,7 @@ if [ $stage -le 4 ]; then
   for n in $(seq $num_archives_intermediate); do
     egs_list="$egs_list ark:$dir/cegs_orig.JOB.$n.ark"
   done
-  echo "$0: Generating training examples on disk"
+  echo "$0: Generating training examples on disk (nj = $nj, max_jobs_run = $max_jobs_run)"
 
   # The examples will go round-robin to egs_list.  Note: we omit the
   # 'normalization.fst' argument while creating temporary egs: the phase of egs
@@ -416,13 +416,13 @@ if [ -f $dir/.error ]; then
 fi
 
 if [ $stage -le 5 ]; then
-  echo "$0: recombining and shuffling order of archives on disk"
+  echo "$0: recombining and shuffling order of archives on disk (max_shuffle_jobs_run = $max_shuffle_jobs_run, archives_multiple = $archives_multiple)"
   # combine all the "egs_orig.*.JOB.scp" (over the $nj splits of the data) and
   # shuffle the order, writing to the egs.JOB.ark
 
   # the input is a concatenation over the input jobs.
-  egs_list=
-  for n in $(seq $nj); do
+  egs_list=$dir/cegs_orig.1.JOB.ark
+  for n in $(seq 2 $nj); do
     egs_list="$egs_list $dir/cegs_orig.$n.JOB.ark"
   done
 
