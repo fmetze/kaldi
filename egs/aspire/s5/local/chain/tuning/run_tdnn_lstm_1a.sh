@@ -27,6 +27,7 @@ cell_dim=1024
 projection_dim=256
 
 # training options
+use_gpu=yes # true, false, wait
 num_epochs=2
 minibatch_size=64,32
 chunk_left_context=40
@@ -244,7 +245,7 @@ if [ $stage -le 13 ]; then
     --tree-dir $treedir \
     --lat-dir $lat_dir \
     --dir $dir \
-    --use-gpu=wait || exit 1;
+    --use-gpu=${use_gpu} || exit 1;
 fi
 
 graph_dir=$dir/graph_pp
