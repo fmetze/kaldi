@@ -1,6 +1,6 @@
 #!/bin/bash
 
-set -e
+#set -e
 
 # based on run_tdnn_7b.sh in the swbd recipe
 
@@ -17,9 +17,10 @@ stage=0
 train_stage=-10
 get_egs_stage=-10
 test_stage=1
-nj=70
+nj=40
 
 tdnn_affix=_1a
+mfcc_reverb=mfcc_reverb
 
 hidden_dim=1024
 cell_dim=1024
@@ -69,7 +70,6 @@ dir=exp/chain/tdnn_lstm${tdnn_affix}
 train_data_dir=data/${train_set}_hires
 train_ivector_dir=exp/nnet3/ivectors_${train_set}
 lang=data/lang_chain
-mfcc_reverb=mfcc_reverb
 
 
 # The iVector-extraction and feature-dumping parts are the same as the standard

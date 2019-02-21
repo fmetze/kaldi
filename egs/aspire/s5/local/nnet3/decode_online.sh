@@ -4,7 +4,7 @@
 # This script does online decoding, unlike local/nnet3/decode.sh which does 2-pass decoding with
 # uniform segments.
 
-set -e
+#set -e
 
 # general opts
 iter=

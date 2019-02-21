@@ -376,10 +376,10 @@ def CreateReverberatedCopy(input_dir,
             data_lib.RunKaldiCommand("wav-to-duration --read-entire-file=true scp:{0}/wav.scp ark,t:{0}/reco2dur".format(input_dir))
         else:
             data_lib.RunKaldiCommand("utils/split_data.sh {0} {1}".format(input_dir, nj))
-            data_lib.RunKaldiCommand('{2} JOB=1:{1} {0}/reco2dur.JOB.log wav-to-duration --read-entire-file=true scp:{0}/split{1}/JOB/wav.scp ark,t:{0}/reco2dur.JOB'.format(input_dir, nj, cmd))
+            data_lib.RunKaldiCommand('{2} JOB=1:{1} {0}/reco2dur.log.JOB wav-to-duration --read-entire-file=true scp:{0}/split{1}/JOB/wav.scp ark,t:{0}/reco2dur.JOB'.format(input_dir, nj, cmd))
             data_lib.RunKaldiCommand('cat {0}/reco2dur.[0-9]* | sort > {0}/reco2dur'.format(input_dir))
             # This is a data directory, so there should not be any stray files left ...
-            data_lib.RunKaldiCommand('rm {0}/reco2dur.[0-9]* {0}/reco2dur.[0-9]*.log'.format(input_dir))
+            data_lib.RunKaldiCommand('rm -f {0}/reco2dur.[0-9]* {0}/reco2dur.log.[0-9]*'.format(input_dir))
     durations = ParseFileToDict(input_dir + "/reco2dur", value_processor = lambda x: float(x[0]))
     wav_scp = ParseFileToDict(input_dir + "/wav.scp", value_processor = lambda x: " ".join(x))
     foreground_snr_array = map(lambda x: float(x), foreground_snr_string.split(':'))
