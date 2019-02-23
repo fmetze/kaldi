@@ -1,6 +1,6 @@
 #!/bin/bash
 
-#set -e
+set -e
 
 # based on run_tdnn_7b.sh in the swbd recipe
 
@@ -28,6 +28,8 @@ projection_dim=256
 
 # training options
 use_gpu=yes # true, false, wait
+num_gpu_start=3
+num_gpu_end=16
 num_epochs=2
 minibatch_size=64,32
 chunk_left_context=40
@@ -226,8 +228,8 @@ if [ $stage -le 13 ]; then
     --trainer.max-param-change 2.0 \
     --trainer.num-epochs $num_epochs \
     --trainer.optimization.shrink-value 0.99 \
-    --trainer.optimization.num-jobs-initial 3 \
-    --trainer.optimization.num-jobs-final 16 \
+    --trainer.optimization.num-jobs-initial $num_gpu_start \
+    --trainer.optimization.num-jobs-final $num_gpu_end \
     --trainer.optimization.initial-effective-lrate 0.001 \
     --trainer.optimization.final-effective-lrate 0.0001 \
     --trainer.optimization.momentum 0.0 \

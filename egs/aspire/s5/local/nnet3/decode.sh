@@ -5,7 +5,7 @@
 # for scoring with ASpIRE scoring server.
 # It also provides the WER for dev_aspire data.
 
-#set -e
+set -e
 
 # general opts
 iter=

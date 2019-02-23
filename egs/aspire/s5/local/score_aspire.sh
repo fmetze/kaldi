@@ -4,7 +4,7 @@
 # This script generates the ctm files, filters and scores them if an stm file is available
 
 set -e
-set -x
+#set -x
 
 iter=final
 min_lmwt=1

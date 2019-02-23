@@ -52,7 +52,7 @@ if [ $stage -le 2 ]; then
   steps/make_mfcc.sh --cmd "$train_cmd" --nj $num_jobs \
     --mfcc-config conf/mfcc_hires.conf data/${data_set}_hires
 
-  steps/compute_cmvn_stats.sh data/${data_set}_hires
+  steps/compute_cmvn_stats.sh --cmd "$train_cmd" --nj 4 data/${data_set}_hires
 
   utils/fix_data_dir.sh data/${data_set}_hires
   utils/validate_data_dir.sh --no-text data/${data_set}_hires
@@ -77,7 +77,7 @@ if [ $stage -le 3 ]; then
 
   utils/data/subsegment_data_dir.sh data/${data_set}_hires \
     data/${segmented_data_set}_hires/sub_segments data/${segmented_data_set}_hires
-  steps/compute_cmvn_stats.sh data/${segmented_data_set}_hires
+  steps/compute_cmvn_stats.sh --cmd "$train_cmd" --nj 4 data/${segmented_data_set}_hires
 
   utils/fix_data_dir.sh data/${segmented_data_set}_hires
   utils/validate_data_dir.sh --no-text data/${segmented_data_set}_hires

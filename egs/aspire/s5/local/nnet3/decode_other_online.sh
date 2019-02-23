@@ -57,7 +57,7 @@ affix=_${affix}${iter:+_iter${iter}}
 
 segmented_data_set=${data_set}_uniformsegmented
 if [ $stage -le 1 ]; then
-  local/generate_uniformly_segmented_data_dir.sh  \
+  local/generate_uniformly_segmented_data_dir.sh --num-jobs $num_jobs \
     --overlap $overlap --window $window $data_set $segmented_data_set
 fi
 
@@ -72,6 +72,15 @@ elif [[ "$data_set" =~  "dev_aspire" ]]; then
   # as we would like to operate in the actual evaluation condition
   out_file=single_dev${affix}_${model_affix}.ctm
   act_data_set=dev_aspire
+elif [[ "$data_set" =~ "upmc_iphone" ]]; then
+  out_file=single_eval${affix}_$model_affix.ctm
+  act_data_set=upmc_iphone
+elif [[ "$data_set" =~ "upmc_kinect" ]]; then
+  out_file=single_eval${affix}_$model_affix.ctm
+  act_data_set=upmc_kinect
+elif [[ "$data_set" =~ "upmc_surface_l" ]]; then
+  out_file=single_eval${affix}_$model_affix.ctm
+  act_data_set=upmc_surface_l
 else
   echo "$0: Unknown data-set $data_set"
   exit 1
