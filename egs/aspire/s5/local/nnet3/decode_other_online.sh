@@ -31,6 +31,7 @@ frames_per_chunk=50 # change for (B)LSTM
 acwt=0.1 # important to change this when using chain models
 post_decode_acwt=1.0 # important to change this when using chain models
 extra_left_context_initial=0
+tune_hyper=true
 
 score_opts="--min-lmwt 6 --max-lmwt 13"
 
@@ -81,6 +82,9 @@ elif [[ "$data_set" =~ "upmc_kinect" ]]; then
 elif [[ "$data_set" =~ "upmc_surface_l" ]]; then
   out_file=single_eval${affix}_$model_affix.ctm
   act_data_set=upmc_surface_l
+elif [[ "$data_set" =~ "dev_presidio" ]]; then
+  out_file=single_eval${affix}_$model_affix.ctm
+  act_data_set=dev_presidio
 else
   echo "$0: Unknown data-set $data_set"
   exit 1
@@ -129,6 +133,6 @@ if [ $stage -le 5 ]; then
     --ctm-beam 6 \
     ${iter:+--iter $iter} \
     --decode-mbr true \
-    --tune-hyper true \
+    --tune-hyper $tune_hyper \
     $lang $decode_dir $act_data_set $segmented_data_set $out_file
 fi

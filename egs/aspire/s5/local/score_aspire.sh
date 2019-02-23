@@ -88,7 +88,7 @@ if  $tune_hyper ; then
   # or use the default values
 
   if [ $stage -le 1 ]; then
-    if [[ "$act_data_set" =~ "dev_aspire" ]]; then
+    if [[ "$act_data_set" =~ "dev_aspire|upmc_iphone|upmc_kinect|upmc_surface_l|dev_presidio" ]]; then
       wip_string=$(echo $word_ins_penalties | sed 's/,/ /g')
       temp_wips=($wip_string)
       $cmd WIP=1:${#temp_wips[@]} $decode_dir/scoring/log/score.wip.WIP.log \

@@ -10,12 +10,14 @@
 # first tries interrogating the headers, and if this fails, it reads the wave
 # files in entirely.)
 
+. ./path.sh
+. ./cmd.sh
+
 frame_shift=0.01
-cmd=run.pl
+cmd=$train_cmd
 nj=4
 
 . utils/parse_options.sh
-. ./path.sh
 
 if [ $# != 1 ]; then
   echo "Usage: $0 [options] <datadir>"
@@ -80,6 +82,10 @@ elif [ -f $data/wav.scp ]; then
       echo "$0: reading from the entire wav file to fix the problem caused by sox commands with speed perturbation. It is going to be slow."
       echo "... It is much faster if you call get_utt2dur.sh *before* doing the speed perturbation via e.g. perturb_data_dir_speed.sh or "
       echo "... perturb_data_dir_speed_3way.sh."
+    fi
+    if grep -q 'ffmpeg.*sox' $data/wav.scp; then
+      read_entire_file=true
+      echo "$0: reading from the entire wav file to fix a pipe problem"
     fi
 
 
