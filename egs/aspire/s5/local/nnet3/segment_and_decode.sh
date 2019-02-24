@@ -10,8 +10,8 @@ set -e
 # general opts
 iter=
 stage=0
-sad_num_jobs=30
-decode_num_jobs=30
+sad_num_jobs=10
+decode_num_jobs=10
 affix=
 
 # segmentation opts
@@ -80,7 +80,7 @@ fi
 
 if [ $stage -le 2 ]; then
   steps/segmentation/detect_speech_activity.sh \
-    --nj $sad_num_jobs --stage $sad_stage \
+    --nj $sad_num_jobs --stage $sad_stage --cmd "$decode_cmd" \
     --affix "$sad_affix" --graph-opts "$sad_graph_opts" \
     --transform-probs-opts "$sad_priors_opts" $sad_opts \
     data/$data_set $sad_nnet_dir mfcc_hires $sad_work_dir \
@@ -155,11 +155,11 @@ decode_dir=${decode_dir}_fg
 
 if [ $stage -le 8 ]; then
   local/score_aspire.sh --cmd "$decode_cmd" \
-    $score_opts \
     --word-ins-penalties "0.0,0.25,0.5,0.75,1.0" \
     --ctm-beam 6 \
     ${iter:+--iter $iter} \
     --decode-mbr true \
     --tune-hyper true \
     $lang $decode_dir $act_data_set $segmented_data_set $out_file
+  #     $score_opts
 fi
