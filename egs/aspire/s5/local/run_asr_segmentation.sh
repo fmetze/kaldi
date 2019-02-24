@@ -40,7 +40,7 @@ nstage=-10
 train_stage=-10
 test_stage=-10
 num_data_reps=3
-affix=_1a   # For segmentation
+affix=1a   # For segmentation
 test_affix=1a
 stage=-1
 nj=80
@@ -59,6 +59,7 @@ if [ $# -ne 0 ]; then
   exit 1
 fi
 
+affix=${affix:+_$affix}
 dir=exp/segmentation${affix}
 mkdir -p $dir
 
@@ -124,6 +125,9 @@ if [ $stage -le 4 ]; then
   if [ ! -f rirs_noises.zip ]; then
     wget --no-check-certificate http://www.openslr.org/resources/28/rirs_noises.zip
     unzip rirs_noises.zip
+    mv RIRS_NOISES/pointsource_noises RIRS_NOISES/pointsource_noises-16kHz
+    echo "Did you create an 8Khz version of the pointsource noises?"
+    exit 1;
   fi
 
   rvb_opts=()
@@ -137,7 +141,8 @@ if [ $stage -le 4 ]; then
   # corrupt the data to generate multi-condition data
   # for data_dir in train dev test; do
   python steps/data/reverberate_data_dir.py \
-    "${rvb_opts[@]}" \
+    --noise-list-file RIRS_NOISES/pointsource_noises/noise_list \
+    --rir-list-file data/impulses_noises/info/rir_list \
     --prefix "rev" \
     --foreground-snrs $foreground_snrs \
     --background-snrs $background_snrs \
@@ -146,7 +151,6 @@ if [ $stage -le 4 ]; then
     --isotropic-noise-addition-probability 0.7 \
     --num-replications $num_data_reps \
     --max-noises-per-minute 4 \
-    --source-sampling-rate 8000 \
     $whole_data_dir $rvb_data_dir
 fi
 
