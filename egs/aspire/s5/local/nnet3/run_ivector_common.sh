@@ -22,15 +22,18 @@ local/multi_condition/check_version.sh || exit 1;
 mkdir -p exp/nnet3
 if [ $stage -le 1 ]; then
   # Download the package that includes the real RIRs, simulated RIRs, isotropic noises and point-source noises
-  wget --no-check-certificate http://www.openslr.org/resources/28/rirs_noises.zip
-  unzip rirs_noises.zip
+  [ -f rirs_noises.zip -o -L rirs_noises.zip ] || -wget --no-check-certificate http://www.openslr.org/resources/28/rirs_noises.zip
+  [ -d RIRS_NOISES -o -L RIRS_NOISES ] || unzip rirs_noises.zip
+  [ `soxi -r RIRS_NOISES/pointsource_noises/noise-free-sound-0130.wav` -eq 8000 ] || echo WARNING: it seems that you need to resample your noises to 8kHz first
 
   rvb_opts=()
   if [ "$base_rirs" == "simulated" ]; then
     # This is the config for the system using simulated RIRs and point-source noises
-    rvb_opts+=(--rir-set-parameters "0.5, RIRS_NOISES/simulated_rirs/smallroom/rir_list")
-    rvb_opts+=(--rir-set-parameters "0.5, RIRS_NOISES/simulated_rirs/mediumroom/rir_list")
-    rvb_opts+=(--noise-set-parameters RIRS_NOISES/pointsource_noises/noise_list)
+    #rvb_opts+=(--rir-set-parameters "0.5, RIRS_NOISES/simulated_rirs/smallroom/rir_list")
+    #rvb_opts+=(--rir-set-parameters "0.5, RIRS_NOISES/simulated_rirs/mediumroom/rir_list")
+    #rvb_opts+=(--noise-set-parameters RIRS_NOISES/pointsource_noises/noise_list)
+    rvb_opts+=(--noise-list-file RIRS_NOISES/pointsource_noises/noise_list)
+    rvb_opts+=(--rir-list-file data/impulses_noises/info/rir_list)
   else
     # This is the config for the JHU ASpIRE submission system
     rvb_opts+=(--rir-set-parameters "1.0, RIRS_NOISES/real_rirs_isotropic_noises/rir_list")
@@ -55,7 +58,6 @@ if [ $stage -le 1 ]; then
       --isotropic-noise-addition-probability 1 \
       --num-replications $num_reps \
       --max-noises-per-minute 1 \
-      --source-sampling-rate 8000 \
       data/${data_dir} data/${data_dir}_rvb
   done
 fi
