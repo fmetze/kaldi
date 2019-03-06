@@ -36,6 +36,8 @@ if [ $# -ne 5 ]; then
   exit 1;
 fi
 
+echo $0 $@
+
 lang=$1
 decode_dir=$2
 act_data_set=$3
@@ -144,6 +146,8 @@ wipfile.close()
     fi
   else
     echo "Using the default values for LMWT and word_ins_penalty"
+    LMWT=$default_lmwt
+    word_ins_penalty=$default_wip
   fi
 
 fi

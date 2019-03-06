@@ -58,6 +58,7 @@ If you want to use GPUs (and have them), go to src/, and configure and make on a
 where "nvcc" is installed.
 EOF
 fi
+: "${use_gpu:=true}"
 
 mkdir -p $dir
 
@@ -118,7 +119,7 @@ if [ $stage -le 6 ]; then
     --cleanup=true \
     --cleanup.remove-egs=$remove_egs \
     --cleanup.preserve-model-interval=10 \
-    --use-gpu=true \
+    --use-gpu=$use_gpu \
     --use-dense-targets=true \
     --feat-dir=$data_dir \
     --targets-scp="$targets_dir/targets.scp" \
